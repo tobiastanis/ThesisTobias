@@ -5,7 +5,7 @@ The visibility analysis is NOT a succes yet
 The conversion to ICRF coordinates is NOT a success yet.
 """
 printje = 1     # Toggle 1 for print max and min values distance L2 and LLO and L2 and Moon
-plotje = 1      # Toggle 1 for plot several figures of the simulation of one nominal orbit
+norm_plots = 1      # Toggle 1 for plot several figures of the simulation of one nominal orbit
 
 import numpy as np
 from scipy.integrate import odeint
@@ -77,103 +77,12 @@ if printje == 1:
     print('Maximum distance L2 to Moon [m]:\n', max(L2_Moon_distance))
     print('Minimum distance L2 to Moon [m]:\n', min(L2_Moon_distance))
 
-########################################################################################################################
-##### Conversion CRTBP to ICRF #####
-t0 = I.t0
-period =I.simulation_span
-
-State_of_the_Moon = []
-x_LUMIO_dimensional = []
-Hill = 0
-for i in range(len(period)):
-    dt = period[i]
-    X_P1P2 = spice_interface.get_body_cartesian_state_at_epoch("Moon", "Earth", "J2000", "NONE", t0+dt)
-    State_of_the_Moon.append(X_P1P2)
-    # Characteristic units
-    L_char = np.linalg.norm(X_P1P2[0:3])
-    #L_char = 384400E3
-    m_char = spice_interface.get_body_gravitational_parameter("Earth")/constants.GRAVITATIONAL_CONSTANT+spice_interface.get_body_gravitational_parameter("Moon")/constants.GRAVITATIONAL_CONSTANT
-    t_char = np.sqrt(L_char**3/(constants.GRAVITATIONAL_CONSTANT*m_char))
-    v_char = L_char/t_char
-
-    if Hill == 1:
-        ### According to Hill ###
-        x_norm = L2_states_norm[i]
-        X_bary_inert = np.transpose([x_norm + np.array([0, 0, 0, -x_norm[1], x_norm[0], 0])])
-        X_dim_inert = np.matmul(np.diag([L_char,L_char,L_char,v_char,v_char,v_char]), X_bary_inert)
-        # Angles
-        beta = np.arctan(X_P1P2[5]/(np.sqrt(X_P1P2[3]**2+X_P1P2[4]**2)))
-        phi = np.arctan(X_P1P2[2]/(np.sqrt(X_P1P2[0]**2+X_P1P2[1]**2)))
-        theta = np.arctan(X_P1P2[1]/X_P1P2[0])
-        theta1 = -theta
-        theta2 = phi
-        theta3 = -beta
-        # Rotation by -beta about z-axis
-        ROT1 = np.array([[np.cos(theta1), np.sin(theta1), 0], [-1 * np.sin(theta1), np.cos(theta1), 0], [0, 0, 1]])
-        # Rotation by phi about y-axis
-        ROT2 = np.array([[np.cos(theta2), 0, -1 * np.sin(theta2)], [0, 1, 0], [np.sin(theta2), 0, np.cos(theta2)]])
-        # Rotation by -theta about x-axis
-        ROT3 = np.array([[np.cos(theta3), np.sin(theta3), 0], [-1 * np.sin(theta3), np.cos(theta3), 0], [0, 0, 1]])
-        # Rotation matrix
-        gamma = np.matmul(np.matmul(ROT1, ROT2), ROT3)
-
-        A = np.concatenate((np.concatenate((gamma, np.zeros((3,3))), axis=1), np.concatenate((np.zeros((3,3)), gamma), axis=1)),
-                   axis=0)
-        X_ICRF = np.matmul(A, X_dim_inert)
-        X_ICRF_primary = X_ICRF-(-I.mu)*X_P1P2
-        X_ICRF_secondary = X_ICRF-(1-I.mu)*X_P1P2
-        x_LUMIO_dimensional.append(X_ICRF_primary)
-
-    else:
-        ### Erdems way ###
-        # Normalized nondimensional rotational state of LUMIO wrt barycenter
-        x_norm = L2_states_norm[i]
-        # Normalized nondimensional rotational state of LUMIO wrt P1
-        x_P1centerednondim = x_norm + np.array([-I.mu, 0, 0, 0, 0, 0])
-        # wrt P1, but dimensional
-        x_P1centereddim = np.matmul(np.diag([L_char,L_char,L_char,v_char,v_char,v_char]), np.transpose([x_P1centerednondim]))
-        # Position and velocity vector of the Moon wrt Earth
-        pos_P1P2 = np.transpose(X_P1P2[0:3])
-        vel_P1P2 = np.transpose(X_P1P2[3:6])
-        # Setting up the attitude matrix A
-        X1 = pos_P1P2 / np.linalg.norm(pos_P1P2)
-        Z1 = np.cross(pos_P1P2, vel_P1P2) / np.linalg.norm(np.cross(pos_P1P2, vel_P1P2))
-        Y1 = np.cross(Z1, X1)
-        A = np.array([X1, Y1, Z1])
-
-        # Angular velocity
-        omega = np.linalg.norm(np.cross(pos_P1P2, vel_P1P2)) / (np.linalg.norm(pos_P1P2)) ** 2
-
-        A_dot = omega * np.array([[A[0, 1], -A[0, 0], 0], [A[1, 1], -A[1, 0], 0], [A[2, 1], -A[2, 0], 0]])
-
-        # Transformation Matrix T
-        T = np.concatenate((np.concatenate((A, np.zeros((3, 3))), axis=1), np.concatenate((A_dot, A), axis=1)), axis=0)
-        X_ICRF = np.matmul(T,x_P1centereddim)
-        x_LUMIO_dimensional.append(X_ICRF)
-
-State_of_the_Moon = np.array(State_of_the_Moon)                     # Correct
-x_LUMIO_dimensional = np.transpose(x_LUMIO_dimensional)[0]          # Not correct
-# -310537.9975687619880773,249423.1565183288475964,174937.7572135815862566 should be the first lumio state
-# -2.79127075e+08  2.52716836e+08  1.45029110e+08   first moon state
-
-#print(State_of_the_Moon)
-#print(x_LUMIO_dimensional)
-
-plt.figure()
-plot = plt.axes(projection='3d')
-plot.plot3D(State_of_the_Moon[:,0], State_of_the_Moon[:,1], State_of_the_Moon[:,2])
-plot.plot3D(x_LUMIO_dimensional[:,0], x_LUMIO_dimensional[:,1], x_LUMIO_dimensional[:,2])
-plot.plot3D(State_of_the_Moon[0,0], State_of_the_Moon[0,1], State_of_the_Moon[0,2], marker='o', markersize=5, color='grey')
-plot.plot3D(x_LUMIO_dimensional[0,0], x_LUMIO_dimensional[0,1], x_LUMIO_dimensional[0,2], marker='o', markersize=5, color='purple')
-plot.plot3D(0, 0, 0, marker='o', markersize=10, color='blue')
-plt.legend(['State Moon', 'State LUMIO', 'Startingpoint Moon', 'Startingpoint LUMIO', 'Earth'])
-plt.show()
 
 ### Plots ###
 # Cartesian element over time LUMIO
 P1_pos = np.array([-I.mu * I.L_char, 0, 0])
 P2_pos = np.array([(1 - I.mu) * I.L_char, 0, 0])
-if plotje == 1:
+if norm_plots == 1:
     fig1, (ax1, ax2, ax3) = plt.subplots(3, 1, constrained_layout=True, sharey=False)
     ax1.plot(I.simulation_time_days, states_L2[:, 0]*10**-3)
     ax1.set_title('Distance of the LUMIO wrt the barycenter in x-direction')
@@ -268,7 +177,7 @@ plt.show()
     ########################################################################################################################
     ##### Visbility analysis ##### Klopt nog geen hout van
     ########################################################################################################################
-
+"""
 r = L2_wrt_Moon_vector
 x = L2_wrt_LLO_vector
 #xx = []
@@ -298,7 +207,7 @@ plt.plot(I.simulation_time_days, h_abs)
 plt.plot(I.simulation_time_days, StringMoonRadius)
 plt.legend(['h', 'Radius Moon'])
 plt.show()
-"""
+
 factor = np.vstack(rx/xx)
 p = factor*x
 p_abs = np.linalg.norm(p, axis=1)
