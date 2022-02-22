@@ -33,7 +33,7 @@ v_LLO = np.sqrt(spice_interface.get_body_gravitational_parameter("Moon")/r_LLO)
 x_LLO_theoretical_i = np.array([0, r_LLO, 0, 0, 0, v_LLO])
 
 ############# Simulation Set up #####################
-simulation_time = 30                    # [days] Adjustable
+simulation_time = 10                    # [days] Adjustable
 n_steps = 30000                         # Number of steps, adjustable
 simulation_start_epoch = 0.0            # Noon 21 March 2024
 simulation_end_epoch = simulation_start_epoch+simulation_time*constants.JULIAN_DAY
@@ -41,4 +41,4 @@ simulation_end_epoch_norm = simulation_end_epoch/(t_char)
 simulation_span = np.linspace(simulation_start_epoch, simulation_end_epoch, n_steps)
 simulation_span_norm = np.linspace(simulation_start_epoch, simulation_end_epoch_norm, n_steps)
 simulation_time_days = simulation_span/constants.JULIAN_DAY
-
+fixed_step_size = 1000

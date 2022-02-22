@@ -4,7 +4,11 @@ import TheoreticalSimulation as TS
 from tudatpy.kernel import constants
 from tudatpy.kernel.interface import spice_interface
 import matplotlib.pyplot as plt
-
+tudat = 1
+if tudat == 1:
+    import tuatpy_propagation as tudat
+    x_LUMIO_tudat = tudat.states_LUMIO
+    x_Moon_tudat = tudat.states_Moon
 datapack = 1
 if datapack == 1:
     import LUMIO_States_reader as lsr
@@ -55,7 +59,7 @@ for i in range(len(period)):
     r_pc = r_pc_nd*l_char
     v_pc = v_pc_nd*v_char
     sv_pc = np.transpose([np.concatenate((r_pc,v_pc), axis=0)])
-
+    #print(sv_pc)
     # Attitude matrix between inertial and rotating frame
     X_ref = r_Moon / np.linalg.norm(r_Moon)
     Z_ref = np.cross(r_Moon,v_Moon)/np.linalg.norm(np.cross(r_Moon,v_Moon))
@@ -77,8 +81,8 @@ for i in range(len(period)):
     A_full = np.concatenate((A_top, A_bot), axis=0)
     # State vector in the ephemeris frame
     x_ephem = np.transpose(np.matmul(A_full, sv_pc))[0]
+    #print(x_ephem)
     x_LUMIO.append(x_ephem)
-
 # States from conversion
 x_LUMIO = np.array(x_LUMIO)
 x_Moon = np.array(x_Moon)
@@ -99,8 +103,14 @@ if datapack==1:
     plot.plot3D(x_LUMIO_data[0, 0]*10**3, x_LUMIO_data[0, 1]*10**3, x_LUMIO_data[0, 2]*10**3, marker='o', markersize=4, color='orange')
     plot.plot3D(x_Moon_data[:, 0]*10**3, x_Moon_data[:, 1]*10**3, x_Moon_data[:, 2]*10**3, color='black')
     plot.plot3D(x_Moon_data[0, 0]*10**3, x_Moon_data[0, 1]*10**3, x_Moon_data[0, 2]*10**3, color='black')
+    plot.plot3D(x_LUMIO_tudat[:, 0], x_LUMIO_tudat[:, 1], x_LUMIO_tudat[:, 2], color='red')
+    plot.plot3D(x_LUMIO_tudat[0, 0], x_LUMIO_tudat[0, 1], x_LUMIO_tudat[0, 2], marker='o', markersize=4, color='red')
+    plot.plot3D(x_Moon_tudat[:, 0], x_Moon_tudat[:, 1], x_Moon_tudat[:, 2], color='brown')
+    plot.plot3D(x_Moon_tudat[0, 0], x_Moon_tudat[0, 1], x_Moon_tudat[0, 2], marker='o', markersize=4, color='brown')
     plt.legend(['Trajectory LUMIO', 'Trajectory Moon', 'Earth', 'Initial state LUMIO', 'Initial state Moon',
-            'Trajectory LUMIO datapack', 'Initial state LUMIO datapack', 'Trajectory Moon datapack', 'Initial state Moon datapack'])
+            'Trajectory LUMIO datapack', 'Initial state LUMIO datapack', 'Trajectory Moon datapack',
+                'Initial state Moon datapack', 'Trajectory LUMIO tudat', 'Initial State LUMIO tudat',
+                'Trajectory Moon tudat', 'Initial state Moon tudat'])
 else:
     plt.legend(['Trajectory LUMIO', 'Trajectory Moon', 'Earth', 'Initial state LUMIO', 'Initial state Moon'])
 plt.title('State of LUMIO after CRTBP to ICRF conversion')
@@ -160,8 +170,23 @@ else:
 plt.title('State of LUMIO after CRTBP to ICRF conversion (yz-plane')
 plt.xlabel('Y-direction [m]'); plt.ylabel('Z-direction [m]')
 
-
-
-
+if datapack == 1:
+    fig1, (ax1, ax2, ax3) = plt.subplots(3, 1, constrained_layout=True, sharey=False)
+    ax1.plot(x_LUMIO[:, 0], x_LUMIO[:, 1])
+    ax1.plot(x_LUMIO_data[:, 0]*10**3, x_LUMIO_data[:, 1]*10**3)
+    ax1.set_title('Trajectory in xy-plane')
+    ax1.set_xlabel('x-direction [m]')
+    ax1.set_ylabel('y-direction [m]')
+    ax2.plot(x_LUMIO[:, 0], x_LUMIO[:, 2])
+    ax2.plot(x_LUMIO_data[:, 0]*10**3, x_LUMIO_data[:, 2]*10**3)
+    ax2.set_title('Trajectory in xz-plane')
+    ax2.set_xlabel('x-direction [m]')
+    ax2.set_ylabel('z-direction [m]')
+    ax3.plot(x_LUMIO[:, 1], x_LUMIO[:, 2])
+    ax3.plot(x_LUMIO_data[:, 1]*10**3, x_LUMIO_data[:, 2]*10**3)
+    ax3.set_title('Trajectory in yz-plane')
+    ax3.set_xlabel('y-direction [m]')
+    ax3.set_ylabel('z-direction [m]')
+    plt.legend(['LUMIO ICRF Trajectory', 'LUMIO  Datapack Trajectory'])
 plt.show()
 
